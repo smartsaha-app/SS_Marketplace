@@ -1,0 +1,293 @@
+from rest_framework import serializers
+from marketplace.models import (
+    TypePost, CategoriePost, Currency, Unit, Product, Post, Post_status,
+    Label,
+)
+
+class TypePostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TypePost
+        fields = ['id', 'type', 'created_at']
+
+
+class CategoriePostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CategoriePost
+        fields = ['id', 'categorie', 'created_at']
+
+class CurrencySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Currency
+        fields = ['id', 'currency', 'iso_code', 'symbol', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+
+class UnitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Unit
+        fields = ['id', 'unit', 'abbreviation', 'created_at']
+
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    unit = UnitSerializer(read_only=True)
+    unit_id = serializers.PrimaryKeyRelatedField(
+        queryset=Unit.objects.all(), source='unit', write_only=True
+    )
+
+    class Meta:
+        model = Product
+        fields = ['id', 'product', 'description', 'unit', 'unit_id', 'created_at']
+
+
+class PostStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post_status
+        fields = ['id', 'name', 'description','is_active','created_at']
+
+        extra_kwargs = {
+            'name': {'error_messages': {'unique': "Ce nom de statut existe déjà."}},
+            'description': {'required': False}
+        }    
+
+    
+    def validate_name(self, value):
+        if not value.isalpha():
+            raise serializers.ValidationError("Le champ 'name' doit contenir uniquement des caractères alphabétiques.")
+        return value
+    
+    def validate(self, data):
+        if 'name' not in data or not data['name']:
+            raise serializers.ValidationError({"name": "Le champ 'name' est requis."})
+        return data
+
+
+    # def create(self, validated_data):    
+    #     print("Données validées reçues :", validated_data)  # Debugging
+    #     instance = Post_status.objects.create(**validated_data)
+    #     print("Instance créée :", instance)  # Debugging
+    #     return instance
+    
+    
+class LabelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Label
+        fields = ['id', 'name', 'color', 'created_at']
+
+
+class PostSerializer(serializers.ModelSerializer):
+    # Relations en lecture seule (avec détails)
+    from  marketplace.serializers.User_serializers import UserSerializer
+
+    user = UserSerializer(read_only=True)
+    type_post = TypePostSerializer(read_only=True)
+    product = ProductSerializer(read_only=True)
+    categorie_post = CategoriePostSerializer(read_only=True)
+    currency = CurrencySerializer(read_only=True)
+    labels = LabelSerializer(many=True, read_only=True)
+
+    # Relations en écriture seule (IDs)
+    type_post_id = serializers.PrimaryKeyRelatedField(
+        queryset=TypePost.objects.all(), source='type_post', write_only=True
+    )
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(), source='product', write_only=True
+    )
+    categorie_post_id = serializers.PrimaryKeyRelatedField(
+        queryset=CategoriePost.objects.all(), source='categorie_post', write_only=True
+    )
+    currency_id = serializers.PrimaryKeyRelatedField(
+        queryset=Currency.objects.all(), source='currency', write_only=True
+    )
+    labels_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Label.objects.all(), many=True, source='labels', write_only=True, required=False
+    )
+
+    # Champs calculés
+    current_status = serializers.SerializerMethodField()
+    total_bids = serializers.SerializerMethodField()
+    highest_bid = serializers.SerializerMethodField()
+    can_receive_bids = serializers.SerializerMethodField()
+
+    # Statut pour la création
+    initial_status_id = serializers.PrimaryKeyRelatedField(
+        queryset=Post_status.objects.filter(is_active=True),
+        write_only=True,
+        required=False
+    )
+
+    class Meta:
+        model = Post
+        fields = [
+            'id', 'title', 'description', 'quantity', 'price', 'location',
+            'image_url', 'created_at', 'updated_at', 'is_active',
+
+            # Relations (lecture)
+            'type_post', 'product', 'user', 'categorie_post', 'currency', 'labels',
+
+            # Relations (écriture)
+            'type_post_id', 'product_id', 'categorie_post_id', 'currency_id', 'labels_ids',
+
+            # Champs calculés
+            'current_status', 'total_bids', 'highest_bid', 'can_receive_bids',
+
+            # Statut initial
+            'initial_status_id'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'user']
+
+    def create(self, validated_data):
+        labels = validated_data.pop('labels', [])
+        initial_status_id = validated_data.pop('initial_status_id', None)
+
+        # Assigner l'utilisateur connecté
+        validated_data['user'] = self.context['request'].user
+
+        # Créer le post
+        post = Post.objects.create(**validated_data)
+
+        # Assigner les labels
+        if labels:
+            post.labels.set(labels)
+
+        return post
+
+    def update(self, instance, validated_data):
+        labels = validated_data.pop('labels', None)
+        validated_data.pop('initial_status_id', None)  # Ignore pour les mises à jour
+
+        # Mettre à jour les champs
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Mettre à jour les labels
+        if labels is not None:
+            instance.labels.set(labels)
+
+        instance.save()
+        return instance
+
+
+    def get_current_status(self, instance):
+        status = instance.get_status_post()
+        return status.name if status else None
+
+
+    def get_total_bids(self, instance):
+        return instance.get_total_bids()
+
+    def get_highest_bid(self, obj: Post):
+        highest_bid = obj.get_highest_bid()
+        if highest_bid:
+            return {
+                'id': highest_bid.id,
+                'price': float(highest_bid.price),  # convertir Decimal en float
+                'currency': highest_bid.currency.iso_code if highest_bid.currency else None,
+                'created_at': highest_bid.created_at.isoformat(),  # datetime en string
+                'user': highest_bid.user.username if highest_bid.user else None
+            }
+        return None
+
+
+    def get_can_receive_bids(self , obj : Post):
+        return obj.can_receive_bids()
+
+    def get_highest_bid_price(self, instance):
+        return instance.get_highest_bid().price
+
+
+    def get_status_history(self, obj):
+        """Retourne l'historique des statuts"""
+        relations = obj.status_relations.select_related('status', 'changed_by').order_by('-date_changed')
+        return [
+            {
+                'status': relation.status.name,
+                'date_changed': relation.date_changed,
+                'changed_by': relation.changed_by.username if relation.changed_by else None,
+                'comment': relation.comment
+            }
+            for relation in relations
+        ]
+
+
+class PostDetailSerializer(PostSerializer):
+    """Serializer détaillé pour les posts avec informations complètes"""
+
+
+    status_history = serializers.SerializerMethodField()
+    active_bids = serializers.SerializerMethodField()
+    accepted_bid = serializers.SerializerMethodField()
+
+    class Meta(PostSerializer.Meta):
+        fields = PostSerializer.Meta.fields + ['status_history', 'active_bids', 'accepted_bid']
+
+    def get_active_bids(self, obj):
+        from marketplace.serializers.Bid_serialisers import BidSerializer
+        active_bids = obj.get_active_bids()  # ✅ queryset
+        return BidSerializer(active_bids, many=True, context=self.context).data
+
+    def get_accepted_bid(self, obj):
+        accepted_bid = obj.get_accepted_bid()  # ✅ un objet ou None
+        from marketplace.serializers.Bid_serialisers import BidSerializer
+        return BidSerializer(accepted_bid, context=self.context).data if accepted_bid else None
+
+
+    def get_current_status(self, instance):
+        status = instance.get_status_post()
+        return status.name if status else None
+
+    def get_total_bids(self, obj : Post):
+        return obj.bids.count()
+
+    def validate_image_url(value : str):
+        if value and not value.startswith('https://'):
+            raise serializers.ValidationError("L'URL doit commencer par ou https://")
+        return value
+
+    def validate_quantity(value : float):
+        if value <= 0:
+            raise serializers.ValidationError("La quantité doit être positive")
+        return value
+
+    def validate_price(value : float):
+        if value <= 0:
+            raise serializers.ValidationError("Le prix doit être positif")
+        return value
+
+    def get_can_receive_bids(self , obj : Post):
+        return obj.can_receive_bids()
+
+    def get_highest_bid(self, obj: Post):
+        highest_bid = obj.get_highest_bid()
+        if highest_bid:
+            return {
+                'id': highest_bid.id,
+                'price': float(highest_bid.price),  # JSON-friendly
+                'currency': highest_bid.currency.iso_code if highest_bid.currency else None,
+                'created_at': highest_bid.created_at.isoformat(),
+                'user': highest_bid.user.username if highest_bid.user else None
+            }
+        return None
+
+
+
+    def get_highest_bid_price(self ,obj: Post):
+        highest_bid = obj.get_highest_bid()
+        return highest_bid.price if highest_bid else None
+
+
+class PostSummarySerializer(serializers.ModelSerializer):
+    """Serializer léger pour les listes de posts"""
+
+    current_status = serializers.SerializerMethodField()
+    total_bids = serializers.SerializerMethodField()
+    highest_bid_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Post
+        fields = [
+            'id', 'title', 'price', 'location', 'image_url', 'created_at',
+            'current_status', 'total_bids', 'highest_bid_price'
+        ]
+
