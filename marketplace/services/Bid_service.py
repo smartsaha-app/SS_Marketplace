@@ -118,7 +118,7 @@ def accept_bid(bid, owner):
     if current_status.name.lower() != "proposée":
         raise ValueError(f"Impossible d'accepter une enchère avec le statut '{current_status.name}'.")
 
-    # Change le statut de l'enchère en acceptée
+    # Change le statut de l'enchère acceptée
     accepted_status = Bid_status.objects.get(name="acceptée")
     BidStatusRelation.objects.create(bid=bid, status=accepted_status, changed_by=owner)
 
@@ -126,3 +126,15 @@ def accept_bid(bid, owner):
     post = bid.post
     sold_status = Post_status.objects.get(name="vendu")
     PostStatusRelation.objects.create(post=post, status=sold_status, changed_by=owner)
+
+    # 🚨 Refuser toutes les autres enchères du même post
+    refused_status = Bid_status.objects.get(name="refusée")
+    other_bids = post.bids.exclude(id=bid.id)  # toutes sauf celle acceptée
+    for other_bid in other_bids:
+        # Vérifie que l'enchère n'est pas déjà refusée ou acceptée
+        if other_bid.get_status_bid().name.lower() == "proposée":
+            BidStatusRelation.objects.create(
+                bid=other_bid,
+                status=refused_status,
+                changed_by=owner
+            )
