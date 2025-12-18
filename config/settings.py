@@ -29,7 +29,14 @@ SECRET_KEY = 'django-insecure-87&#dd_n9_ov2%=_3$y*iezr_(o!-a@kfr8du^@s%jp_661ddg
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "ss-marketplace.onrender.com",
+    "smartsaha-marketplace.vercel.app",
+    "sales.smart-saha.com"
+]
+
 
 import dj_database_url
 import os
