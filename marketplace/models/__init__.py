@@ -7,3 +7,4 @@ from .Interations_models import *
 from .Notifications_models import *
 from .Bid_models import *
 from .permissions import *
+from .Payments_models import *

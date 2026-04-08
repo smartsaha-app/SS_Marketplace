@@ -22,7 +22,13 @@ class Report(models.Model):
     id_post = models.ForeignKey('marketplace.Post', on_delete=models.SET_NULL, blank=True, null=True)
     id_message = models.ForeignKey('marketplace.Message', on_delete=models.SET_NULL, blank=True, null=True)
     reason = models.CharField(max_length=255)
-    status = models.CharField(max_length=50, default='pending')
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):

@@ -16,8 +16,11 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from marketplace.models.Post_models import Post_status
 from marketplace.serializers.User_serializers import CustomTokenObtainSerializer
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from django.db.models import Q
-
+from rest_framework import status
+from marketplace.models import Post_status
+from django.db.models import Avg
 
 from marketplace.models import (
       Chat, Message, Review, Favorite, Report, Notification, User
@@ -39,11 +42,15 @@ class ChatViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        # Si Swagger ou user non authentifié
+        if getattr(self, 'swagger_fake_view', False) or not self.request.user.is_authenticated:
+            return Chat.objects.none()
+
         user = self.request.user
-        # Chats où l'utilisateur est propriétaire du post ou a envoyé un message
         return Chat.objects.filter(
             Q(id_post__user=user) | Q(message__id_user=user)
         ).distinct()
+
 
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()
@@ -67,26 +74,128 @@ class MessageViewSet(viewsets.ModelViewSet):
             except ValueError:
                 pass
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def mark_as_read(self, request):
+        chat_id = request.data.get('chat_id')
+
+        Message.objects.filter(
+            id_chat_id=chat_id,
+            is_read=False
+        ).exclude(id_user=request.user).update(is_read=True)
+
+        return Response({'status': 'ok'})
+
 
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def perform_create(self, serializer):
+        serializer.save(id_user_from=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='user/(?P<user_id>[^/.]+)')
+    def user_reviews(self, request, user_id=None):
+        user_id = int(user_id)  
+        reviews = Review.objects.filter(id_user_to_id=user_id)
+        average_rating = reviews.aggregate(avg_rating=Avg('rating'))['avg_rating'] or 0
+
+        serializer = ReviewSerializer(reviews, many=True)
+
+        return Response({
+            "average_rating": round(average_rating, 2),
+            "reviews": serializer.data
+        })
+
 class FavoriteViewSet(viewsets.ModelViewSet):
-    queryset = Favorite.objects.all()
     serializer_class = FavoriteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # Empêche les erreurs avec Swagger ou utilisateurs non authentifiés
+        if getattr(self, 'swagger_fake_view', False) or not user.is_authenticated:
+            return Favorite.objects.none()
+
+        post_id = self.request.query_params.get("id_post")
+        queryset = Favorite.objects.filter(id_user=user)
+        if post_id:
+            queryset = queryset.filter(id_post_id=post_id)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(id_user=self.request.user)
 
 class ReportViewSet(viewsets.ModelViewSet):
     queryset = Report.objects.all()
     serializer_class = ReportSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(
+            id_user=self.request.user,
+            status="pending"
+        )
+
+    @action(detail=False, methods=["post"])
+    def approve(self, request):
+        """
+        Approuver tous les reports d'un post et supprimer le post associé.
+        """
+        post_id = request.data.get("post_id")
+        if not post_id:
+            return Response({"error": "post_id requis"}, status=400)
+
+        reports = Report.objects.filter(id_post__id=post_id)
+        if not reports.exists():
+            return Response({"error": "Aucun report trouvé pour ce post"}, status=404)
+
+        # Marquer tous les reports comme approuvés
+        reports.update(status="approved")
+
+        # Supprimer le post
+        post = reports.first().id_post
+        try:
+            deleted_status = Post_status.objects.get(name="supprimé")
+            changer_statut_post(
+                post_id=post.id,
+                statut_id=deleted_status.id,
+                changed_by=request.user,
+                comment="Post supprimé via approbation de tous les reports"
+            )
+            post.is_active = False
+            post.save()
+        except Post_status.DoesNotExist:
+            return Response({"error": "Le statut 'supprimé' n'existe pas"}, status=400)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=400)
+
+        return Response({"detail": "Tous les reports approuvés et le post supprimé."}, status=200)
 
 class NotificationViewSet(viewsets.ModelViewSet):
-    queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # Si c'est une "fake view" pour Swagger → retourner un queryset vide
+        if getattr(self, 'swagger_fake_view', False):
+            return Notification.objects.none()
+
+        # Sécurité supplémentaire : si l'utilisateur n'est pas authentifié
+        if not user.is_authenticated:
+            return Notification.objects.none()
+
+        # Retourne uniquement les notifications de l'utilisateur connecté
+        return Notification.objects.filter(id_user=user).order_by('-created_at')
+
+    def perform_create(self, serializer):
+        # Associer automatiquement la notification à l'utilisateur
+        serializer.save(id_user=self.request.user)
+
+
 
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
@@ -107,40 +216,42 @@ class CurrentUserView(APIView):
             "username": user.username,
             "email": user.email,
             "justificatif_url": getattr(user, "justificatif_url", None),
+            "avatar_url": getattr(user, "avatar_url", None),
             "id_categorie_user": id_categorie_user_data,
             "id_categorie_user_id": getattr(user, "id_categorie_user_id", None),
             "password": "",  # ne jamais renvoyer le mot de passe réel pour la sécurité
         })
 
 class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainSerializer
 
     def post(self, request, *args, **kwargs):
-        # Appelle la méthode post parent pour générer les tokens
-        response = super().post(request, *args, **kwargs)
-        
-        # La réponse contient le refresh token et access token dans response.data
-        refresh_token = response.data.get('refresh')
-        access_token = response.data.get('access')
-        
-        if refresh_token:
-            # Supprime le refresh token du corps de la réponse JSON
-            response.data.pop('refresh')
+        serializer = self.get_serializer(data=request.data)
 
-            response.set_cookie(
-                key='refresh_token',
-                value=refresh_token,
-                httponly=True,
-                secure=True,
-                samesite='Strict',
-                max_age=7*24*60*60,
-                path='/api/token/refresh/',
-            )
-        
-        # Réinjecte le data JSON sans refresh token dans la réponse
-        response.data = {'access': access_token}
+        try:
+            serializer.is_valid(raise_exception=True)
+        except AuthenticationFailed as e:
+            print("Authentication error:", e)  # <-- affiche dans console serveur
+            return Response({'detail': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        except PermissionDenied as e:
+            print("Permission denied error:", e)  # <-- affiche dans console serveur
+            return Response({'detail': str(e)}, status=status.HTTP_403_FORBIDDEN)
 
+        user = serializer.validated_data['user']
+        refresh = RefreshToken.for_user(user)
+
+        response = Response({'access': str(refresh.access_token)}, status=status.HTTP_200_OK)
+        response.set_cookie(
+            key='refresh_token',
+            value=str(refresh),
+            httponly=True,
+            secure=True,
+            samesite='Strict',
+            max_age=7*24*60*60,
+            path='/api/token/refresh/',
+        )
         return response
-
+    
 # class CustomTokenObtainPairView(TokenObtainPairView):
 #     serializer_class = CustomTokenObtainSerializer
 

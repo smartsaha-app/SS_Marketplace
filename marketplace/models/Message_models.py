@@ -19,4 +19,5 @@ class Message(models.Model):
     id_user = models.ForeignKey('marketplace.User', on_delete=models.CASCADE)
     id_chat = models.ForeignKey(Chat, on_delete=models.CASCADE)
     id_type_message = models.ForeignKey(TypeMessage, on_delete=models.CASCADE)
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

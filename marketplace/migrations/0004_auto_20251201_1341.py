@@ -15,7 +15,7 @@ def create_post_statuses(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('marketplace', '0003_alter_post_status_id'),  # ici mets la dernière migration appliquée
+        ('marketplace', '0003_alter_post_status_id'), 
     ]
 
     operations = [

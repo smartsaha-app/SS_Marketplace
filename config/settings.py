@@ -10,7 +10,11 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+import environ
+from dotenv import load_dotenv
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +31,15 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# import dj_database_url
+
+# DATABASES = {
+#     'default': dj_database_url.parse(
+#         "postgres://avnadmin:AVNS_V5UwXtp1VgkKGqWnFNc@pg-3c4477d9-smartsaha-marketplace.f.aivencloud.com:16718/defaultdb?sslmode=require",
+#         conn_max_age=600,
+#         ssl_require=True
+#     )
+# }
 
 # Application definition
 
@@ -81,11 +94,14 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# smartsaha_mp
+# smartsaha_marketplace
+# smartsaha_mp_vf
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'marketplace',
+        'NAME': 'smartsaha_mp_vf',
         'USER': 'postgres',
         'PASSWORD': 'root',
         'HOST': 'localhost',
@@ -139,18 +155,42 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',  # Pour sécuriser toute l’API par défaut
+        'rest_framework.permissions.IsAuthenticated',  
     ),
 }
 
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    # 'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),      # Durée de vie du token d’accès
+    # 'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),      =
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=5),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),         # Durée de vie du refresh token
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),         
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+EMAIL_HOST_USER = 'ivoandrianah@gmail.com'
+EMAIL_HOST_PASSWORD = 'hier tslv ijzr fwyw'
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "https://smartsaha-marketplace.vercel.app",
+    "https://sales.smart-saha.com",
+]
+
+# settings.py
+STRIPE_SECRET_KEY = "sk_test_51T1Pl36Vwzd1MvbVZfzPAVXZ7SZoD2krjnS2UX6PPfh5EIkCWZr8Be2BeVY6bdWP83HASpTsuGwFQmUCVDGyJlWl00n5iGA9Ve"  # ta clé secrète Stripe
+STRIPE_PUBLISHABLE_KEY = "pk_test_51T1Pl36Vwzd1MvbVkxzdQmmokR4rarmYrf3apCIuy0omcRSMXRJpA1Y7EhtnGejdSBkL7yAbXIwPT6CDXiL1o15J00XRca7yFF" 
+FRONTEND_URL = "http://localhost:3000"
+
+# cartes de test = 4242424242424242

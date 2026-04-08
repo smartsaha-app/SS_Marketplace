@@ -38,9 +38,12 @@ from marketplace.views import (
     CurrentUserView,
     CustomTokenObtainPairView,
     CustomTokenRefreshView,
-    CategorieUserViewSet
+    CategorieUserViewSet,
+    LabelViewSet
 )
 from marketplace.views.BidView import BidViewSet
+# from marketplace.views.PaymentView import MyPaymentsView, PaymentCreateVerifyView
+from marketplace.views.PaymentsView import ConfirmPaymentBuyerView, ConfirmPaymentSellerView, CreatePaymentView, PaymentListView, SecurePaymentView
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
@@ -57,6 +60,7 @@ router.register(r'units', UnitViewSet, basename='unit')
 router.register(r'typepost' ,TypePostViewSet, basename='typepost')
 router.register(r'categoriepost' ,CategoriePostViewSet, basename='categoriepost')
 router.register(r'poststatus', PostStatusViewSet, basename='poststatus')
+router.register(r'label', LabelViewSet, basename='label')
 router.register(r'categorieuser', CategorieUserViewSet, basename='categorieuser')
 router.register(r'bids', BidViewSet, basename='bid')
 urlpatterns = [
@@ -69,10 +73,19 @@ urlpatterns = [
 
     # Inscription
     path('api/register/', RegisterView.as_view(), name='register'),
-
     # API REST via router
     path('api/', include(router.urls)),
     path('api/me/', CurrentUserView.as_view(), name='current-user'),
+    # path('payments/verify/', PaymentCreateVerifyView.as_view(), name='payment-verify'),
+    # path("payments/me/", MyPaymentsView.as_view(), name="my-payments"),
+
+    path('payments/create/', CreatePaymentView.as_view(), name='create-payment'),
+    path('payments/', PaymentListView.as_view(), name='list-payments'),
+    path('payments/<int:pk>/confirm-buyer/', ConfirmPaymentBuyerView.as_view(), name='confirm-buyer'),
+    path('payments/<int:pk>/confirm-seller/', ConfirmPaymentSellerView.as_view(), name='confirm-seller'),
+    path('payments/<int:pk>/secure/', SecurePaymentView.as_view(), name='secure'),
+
 
 ]
+
 

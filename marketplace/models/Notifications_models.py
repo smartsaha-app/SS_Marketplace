@@ -14,7 +14,7 @@ class PostTag(models.Model):
 
 class Notification(models.Model):
     id_user = models.ForeignKey('marketplace.User', on_delete=models.CASCADE)
-    message = models.CharField(max_length=255)
+    message = models.TextField()
     is_read = models.BooleanField(default=False)
     notification_type = models.CharField(max_length=50)
     reference_id = models.IntegerField(blank=True, null=True)

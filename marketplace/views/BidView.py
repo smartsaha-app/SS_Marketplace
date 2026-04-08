@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404
 from marketplace.models import Bid, Post
 from marketplace.serializers import BidSerializer, BidDetailSerializer, RejectBidSerializer
 from marketplace.services import cancel_bid, update_bid, reject_bid
+from marketplace.services.Notification_service import NotificationService
 
 
 class BidViewSet(viewsets.ModelViewSet):
@@ -250,6 +251,18 @@ class BidViewSet(viewsets.ModelViewSet):
         try:
             from marketplace.services.Bid_service import accept_bid
             accept_bid(bid=bid, owner=request.user)
+            NotificationService.create_notification(
+                user=bid.user,
+                message=(
+                    f"Votre enchère sur l'annonce '{bid.post.title}' a été acceptée par le propriétaire. "
+                    f"Le prix accepté est : {bid.price} {bid.currency.symbol}.\n\n"
+                    "Veuillez contacter le vendeur pour finaliser la transaction via la messagerie de la plateforme "
+                    "ou par email : {bid.post.user.email}.\n"
+                    f"Consultez votre enchère ici : https://sales.smart-saha.com//dashboard/bid/"
+                ),
+                notification_type="bid_accepted",
+                reference_id=bid.id
+            )
             return Response({"message": "Enchère acceptée avec succès."}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

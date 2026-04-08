@@ -4,6 +4,7 @@ from .User_serializers import UserSerializer, CategorieUserSerializer
 from .Message_serializers import ChatSerializer,MessageSerializer
 from  .Interation_serializers import ReviewSerializer, FavoriteSerializer, ReportSerializer
 from .Notification_serializers import NotificationSerializer
+from .Payments_serializers import PaymentSerializer, PaymentListSerializer
 
 __all__ = [
     "PostSerializer",
@@ -20,6 +21,8 @@ __all__ = [
     "ProductSerializer",
     "PlaceBidSerializer",
     "CategorieUserSerializer",
-    "RejectBidSerializer"
+    "RejectBidSerializer",
+    "PaymentSerializer",
+    "PaymentListSerializer"
 
 ]

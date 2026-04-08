@@ -12,6 +12,8 @@ class User(AbstractUser):
     justificatif_url = models.URLField(blank=True, null=True)
     id_categorie_user = models.ForeignKey(CategorieUser, on_delete=models.CASCADE)
     is_verified = models.BooleanField(default=False)
+    stripe_account_id = models.CharField(max_length=255, blank=True, null=True)
+    avatar_url = models.URLField(blank=True, null=True)
 
     def __str__(self):
         return self.username

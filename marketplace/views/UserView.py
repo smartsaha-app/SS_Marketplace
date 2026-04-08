@@ -22,9 +22,15 @@ class UserViewSet(viewsets.ModelViewSet):
     def verify_user(self, request, pk=None):
         user = self.get_object()
         user.is_verified = True
-        user.is_active = True  
         user.save()
         return Response({"message": f"Utilisateur {user.username} vérifié avec succès."}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='activer')
+    def active_user(self, request, pk=None):
+        user = self.get_object()
+        user.is_active = True  
+        user.save()
+        return Response({"message": f"Utilisateur {user.username} activé avec succès."}, status=status.HTTP_200_OK)
 
 class CategorieUserViewSet(viewsets.ModelViewSet):
     queryset = CategorieUser.objects.all()

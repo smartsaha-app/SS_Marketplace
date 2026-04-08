@@ -10,6 +10,7 @@ import logging
 
 from marketplace.models import Post, Bid, Bid_status, BidStatusRelation, Post_status, Currency, CategoriePost, \
     PostStatusRelation
+from marketplace.models.User_models import User
 from marketplace.serializers import (
     PostSerializer, PostDetailSerializer, BidSerializer,
     BidDetailSerializer, PlaceBidSerializer
@@ -17,7 +18,10 @@ from marketplace.serializers import (
 from marketplace.models import IsOwnerOrReadOnly
 from marketplace.serializers.Post_serializers import CurrencySerializer, CategoriePostSerializer, PostStatusSerializer
 from rest_framework.decorators import api_view  # Import api_view
+from marketplace.services.Notification_service import NotificationService
 from marketplace.services.Post_service import changer_statut_post
+from marketplace.models import Label
+from marketplace.serializers.Post_serializers import LabelSerializer
 
 logger = logging.getLogger(__name__)  # Ajout d’un logger
 
@@ -75,6 +79,7 @@ class PostViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         post = serializer.save(user=self.request.user)
 
+        # Statut initial "brouillon"
         statut, created = Post_status.objects.get_or_create(
             name="brouillon",
             defaults={"description": "Statut initial"}
@@ -85,6 +90,23 @@ class PostViewSet(viewsets.ModelViewSet):
             status=statut,
             comment="Statut initial"
         )
+
+        # --- Notification pour l'admin ---
+        admins = User.objects.filter(is_staff=True)
+        for admin in admins:
+            NotificationService.create_notification(
+                user=admin,
+                message=(
+                    f"Une nouvelle annonce a été soumise par {post.user.username} "
+                    f"intitulée : '{post.title}'.\n"
+                    "Merci de bien vouloir examiner et approuver cette annonce afin qu'elle soit publiée.\n"
+                    "Consultez la liste des annonces ici : http://localhost:3000/admin/posts"
+                ),
+                notification_type="post_submission",
+                reference_id=post.id
+            )
+
+
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_posts(self, request):
@@ -108,6 +130,18 @@ class PostViewSet(viewsets.ModelViewSet):
             try:
                 bid = serializer.save()
                 bid_data = BidDetailSerializer(bid).data
+                
+                NotificationService.create_notification(
+                    user=post.user,
+                    message=(
+                        f"Une nouvelle enchère a été placée sur votre annonce '{post.title}' "
+                        f"par l'utilisateur {bid.user.username}.\n"
+                        "Veuillez examiner l'enchère et gérer votre annonce si nécessaire.\n"
+                        f"Accédez aux enchères ici : http://localhost:3000/dashboard/post/bids/{post.id}"
+                    ),
+                    notification_type="bid_placed",
+                    reference_id=bid.id
+                )
                 return Response({"message": "Enchère placée avec succès", "bid": bid_data}, status=201)
             except Exception as e:
                 logger.exception(f"[Bid] Erreur interne : {str(e)}")
@@ -163,6 +197,16 @@ class PostViewSet(viewsets.ModelViewSet):
                 changed_by=request.user,
                 comment=comment
             )
+
+            NotificationService.create_notification(
+                user=post.user,
+                message=(
+                    f"Votre annonce '{post.title}' a été validée par l'administrateur. "
+                    "Elle est désormais publiée et visible par tous les utilisateurs."
+                ),
+                notification_type="post_published",
+                reference_id=post.id
+            )
         except Post_status.DoesNotExist:
             return Response({"error": "Le statut 'published' n'existe pas"}, status=400)
         except ValueError as e:
@@ -184,6 +228,14 @@ class CategoriePostViewSet(viewsets.ModelViewSet):
     serializer_class = CategoriePostSerializer
     permission_classes = [AllowAny]
 
+class LabelViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet pour gérer les labels
+    """
+    queryset = Label.objects.all()
+    serializer_class = LabelSerializer
+    permission_classes = [AllowAny]
+    
 class PostStatusViewSet(viewsets.ModelViewSet):
     queryset = Post_status.objects.all()
     serializer_class = PostStatusSerializer

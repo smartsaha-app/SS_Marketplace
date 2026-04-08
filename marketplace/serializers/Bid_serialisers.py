@@ -109,7 +109,9 @@ class PlaceBidSerializer(serializers.Serializer):
             raise serializers.ValidationError("Vous ne pouvez pas enchérir sur votre propre post.")
 
         current_status = post.get_status_post()
-        if not current_status or current_status.name.lower() != "published":
+        allowed_statuses = ["published", "négociation"]  
+
+        if not current_status or current_status.name.lower().strip() not in [s.lower() for s in allowed_statuses]:
             raise serializers.ValidationError(
                 f"Ce post ne peut pas recevoir d'enchères car son statut est '{current_status.name if current_status else 'inconnu'}'."
             )
@@ -140,4 +142,5 @@ class RejectBidSerializer(serializers.Serializer):
     def validate(self, data):
         if not data['continue_negotiation'] and not data.get('message'):
             raise serializers.ValidationError("Un message est requis si vous arrêtez la négociation.")
+
         return data

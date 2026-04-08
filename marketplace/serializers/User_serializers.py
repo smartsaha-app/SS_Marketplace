@@ -1,32 +1,37 @@
 from rest_framework import serializers
 from marketplace.models import User, CategorieUser
 from django.contrib.auth import authenticate
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
+from django.contrib.auth import get_user_model
 
+User = get_user_model()
 class CustomTokenObtainSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        username = attrs.get('username')
-        password = attrs.get('password')
+        username = attrs.get("username")
+        password = attrs.get("password")
 
         if not username or not password:
-            raise serializers.ValidationError("Veuillez fournir votre nom d'utilisateur et mot de passe.")
+            raise AuthenticationFailed("Veuillez fournir nom d'utilisateur et mot de passe.")
 
-        user = authenticate(username=username, password=password)
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            raise AuthenticationFailed("Nom d'utilisateur ou mot de passe incorrect.")
 
-        if not user:
-            raise serializers.ValidationError("Nom d'utilisateur ou mot de passe incorrect.")
-        
+        # Vérifie le mot de passe manuellement
+        if not user.check_password(password):
+            raise AuthenticationFailed("Nom d'utilisateur ou mot de passe incorrect.")
+
+        # Vérifie si le compte est actif
         if not user.is_active:
-            raise serializers.ValidationError("Votre compte n'est pas actif. Veuillez contacter les administrateurs.")
-        
-        # Si tu as un champ is_verified ou autre
-        if hasattr(user, 'is_verified') and not user.is_verified:
-            raise serializers.ValidationError("Votre compte n'est pas encore vérifié.")
+            raise PermissionDenied("Votre compte est actuellement inactif.")
 
-        attrs['user'] = user
+        attrs["user"] = user
         return attrs
+
 
 class CategorieUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -52,6 +57,8 @@ class UserSerializer(serializers.ModelSerializer):
             'password',
             'is_verified',   
             'is_active',
+            'avatar_url',
+            'date_joined'
         ]
 
     def create(self, validated_data):

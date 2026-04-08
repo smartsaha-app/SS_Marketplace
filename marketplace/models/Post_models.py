@@ -4,9 +4,6 @@ from django.db import models
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 
-# from marketplace import serializers
-
-
 class TypePost(models.Model):
     type = models.CharField(max_length=50, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -68,7 +65,7 @@ class Unit(models.Model):
 
 class Label(models.Model):
     name = models.CharField(max_length=100, unique=True)
-    color = models.CharField(max_length=7, default="#000000")  # Couleur hex
+    color = models.CharField(max_length=7, default="#000000")  
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -211,9 +208,27 @@ class Post(models.Model):
 
     def get_highest_bid(self):
         """
-        Retourne l'enchère la plus élevée pour ce post
+        Retourne l'enchère la plus élevée pour 'Selling' ou la plus basse pour 'Buying',
+        en ne considérant que les bids dont le dernier statut est 'Proposée' ou 'Acceptée'.
         """
-        return self.bids.order_by('-price').first()
+        from marketplace.models.Bid_models import BidStatusRelation  # import local
+
+        # Sous-requête pour récupérer le dernier statut de chaque bid
+        latest_status = BidStatusRelation.objects.filter(
+            bid=models.OuterRef('pk')
+        ).order_by('-date_changed').values('status__name')[:1]
+
+        active_bids = self.bids.annotate(
+            last_status=models.Subquery(latest_status)
+        ).filter(last_status__in=["proposée", "acceptée"])
+
+        if self.type_post.type == "Selling":
+            return active_bids.order_by('-price').first()
+        elif self.type_post.type == "Buying":
+            return active_bids.order_by('price').first()
+        
+        return None
+
 
     def get_active_bids(self):
         """

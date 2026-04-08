@@ -33,12 +33,16 @@ class TypeMessageSerializer(serializers.ModelSerializer):
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    id_user = serializers.PrimaryKeyRelatedField(read_only=True)  # injecté via JWT
+    id_user = serializers.PrimaryKeyRelatedField(read_only=True)
     id_chat = serializers.PrimaryKeyRelatedField(queryset=Chat.objects.all())
     id_type_message = TypeMessageSerializer(read_only=True)
     id_type_message_id = serializers.PrimaryKeyRelatedField(
-        queryset=TypeMessage.objects.all(), source='id_type_message', write_only=True
+        queryset=TypeMessage.objects.all(),
+        source='id_type_message',
+        write_only=True
     )
+
+    is_read = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Message
@@ -49,5 +53,6 @@ class MessageSerializer(serializers.ModelSerializer):
             'id_chat',
             'id_type_message',
             'id_type_message_id',
+            'is_read',
             'created_at',
         ]
