@@ -29,7 +29,13 @@ SECRET_KEY = 'django-insecure-87&#dd_n9_ov2%=_3$y*iezr_(o!-a@kfr8du^@s%jp_661ddg
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "ss-marketplace.onrender.com",
+    "smartsaha-marketplace.vercel.app",
+    "sales.smart-saha.com"
+]
 
 # import dj_database_url
 
@@ -40,6 +46,17 @@ ALLOWED_HOSTS = []
 #         ssl_require=True
 #     )
 # }
+
+import dj_database_url
+import os
+
+DATABASES = {
+    "default": dj_database_url.config(
+        default=os.environ.get("DATABASE_URL"),
+        conn_max_age=600,
+        ssl_require=True
+    )
+}
 
 # Application definition
 
@@ -98,16 +115,16 @@ CORS_ALLOW_ALL_ORIGINS = True
 # smartsaha_marketplace
 # smartsaha_mp_vf
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'smartsaha_mp_vf',
-        'USER': 'postgres',
-        'PASSWORD': 'root',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'vf_marketplace',
+#         'USER': 'postgres',
+#         'PASSWORD': 'root',
+#         'HOST': 'localhost',
+#         'PORT': '5432',
+#     }
+# }
 
 
 # Password validation
@@ -182,7 +199,6 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "http://localhost:3001",
     "http://127.0.0.1:3000",
     "https://smartsaha-marketplace.vercel.app",
     "https://sales.smart-saha.com",

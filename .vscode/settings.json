@@ -1,0 +1,9 @@
+{
+    "python.testing.pytestArgs": [
+        "."
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "files.autoSave": "afterDelay",
+    "CodeGPT.apiKey": "CodeGPT Plus Beta"
+}

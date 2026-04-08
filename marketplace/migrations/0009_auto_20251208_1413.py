@@ -16,10 +16,11 @@ def create_users(apps, schema_editor):
     User.objects.get_or_create(
         username="admin",
         defaults={
-            "password": make_password("Andria192766!"),  
+
+            "password": make_password("SmartSaha2025!"),  
             "first_name": "Super",
             "last_name": "Admin",
-            "email": "andriamihamina192766@gmail.com",
+            "email": "smartsahaapp@gmail.com",
             "is_superuser": True,
             "is_staff": True,
             "is_active": True,
@@ -27,18 +28,7 @@ def create_users(apps, schema_editor):
             "id_categorie_user": admin_category,
             "is_verified": True
         },
-        # defaults={
-        #     "password": make_password("SmartSaha2025!"),  
-        #     "first_name": "Super",
-        #     "last_name": "Admin",
-        #     "email": "smartsahaapp@gmail.com",
-        #     "is_superuser": True,
-        #     "is_staff": True,
-        #     "is_active": True,
-        #     "date_joined": timezone.now(),
-        #     "id_categorie_user": admin_category,
-        #     "is_verified": True
-        # }
+
     )
 
 class Migration(migrations.Migration):
